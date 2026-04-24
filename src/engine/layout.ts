@@ -2,8 +2,8 @@ import type { ArchNode, ArchConnection, NodePosition, FlowDirection } from "./ty
 
 const DEFAULT_NODE_W = 110;
 const DEFAULT_NODE_H = 44;
-const DEFAULT_NODE_GAP = 20;
-const DEFAULT_LAYER_GAP = 70;
+const DEFAULT_NODE_GAP = 24;
+const DEFAULT_LAYER_GAP = 80;
 const DEFAULT_PADDING = 24;
 
 /**
@@ -98,17 +98,20 @@ export function layoutNodes(
     if (ids.length > maxLayerSize) maxLayerSize = ids.length;
   }
 
+  // Calculate total cross-axis span for centering
+  const maxCrossSpan = maxLayerSize * nh + Math.max(0, maxLayerSize - 1) * nodeGap;
+
   for (const [layerIdx, ids] of sortedLayers) {
-    const totalW = ids.length * nw + (ids.length - 1) * nodeGap;
-    const totalH = ids.length * nh + (ids.length - 1) * nodeGap;
+    const layerSpan = ids.length * nh + Math.max(0, ids.length - 1) * nodeGap;
+    const offset = (maxCrossSpan - layerSpan) / 2;
 
     for (let i = 0; i < ids.length; i++) {
       if (direction === "horizontal") {
         const x = pad + layerIdx * (nw + layerGap);
-        const y = pad + i * (nh + nodeGap) + (maxLayerSize * (nh + nodeGap) - totalH) / 2;
+        const y = pad + offset + i * (nh + nodeGap);
         positions.set(ids[i], { x, y, w: nw, h: nh });
       } else {
-        const x = pad + i * (nw + nodeGap) + (maxLayerSize * (nw + nodeGap) - totalW) / 2;
+        const x = pad + offset + i * (nw + nodeGap);
         const y = pad + layerIdx * (nh + layerGap);
         positions.set(ids[i], { x, y, w: nw, h: nh });
       }
@@ -120,11 +123,11 @@ export function layoutNodes(
   let height: number;
 
   if (direction === "horizontal") {
-    width = pad * 2 + numLayers * nw + (numLayers - 1) * layerGap;
-    height = pad * 2 + maxLayerSize * nh + (maxLayerSize - 1) * nodeGap;
+    width = pad * 2 + numLayers * nw + Math.max(0, numLayers - 1) * layerGap;
+    height = pad * 2 + maxCrossSpan;
   } else {
-    width = pad * 2 + maxLayerSize * nw + (maxLayerSize - 1) * nodeGap;
-    height = pad * 2 + numLayers * nh + (numLayers - 1) * layerGap;
+    width = pad * 2 + maxCrossSpan;
+    height = pad * 2 + numLayers * nh + Math.max(0, numLayers - 1) * layerGap;
   }
 
   return { positions, width, height };
