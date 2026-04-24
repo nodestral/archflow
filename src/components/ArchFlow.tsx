@@ -95,6 +95,7 @@ export function ArchFlow({
               direction={direction}
               theme={theme}
               index={i}
+              allPositions={positions}
             />
           );
         })}

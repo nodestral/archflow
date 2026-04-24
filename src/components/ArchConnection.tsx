@@ -7,9 +7,10 @@ interface ArchConnectionRendererProps {
   connection: ArchConnection;
   fromPos: NodePosition;
   toPos: NodePosition;
-  direction: FlowDirection;
+ direction: FlowDirection;
   theme: ArchTheme;
   index: number;
+  allPositions?: Map<string, NodePosition>;
 }
 
 /**
@@ -23,8 +24,9 @@ export function ArchConnectionRenderer({
   direction,
   theme,
   index,
+  allPositions,
 }: ArchConnectionRendererProps) {
-  const pathInfo = calcPath(fromPos, toPos, direction);
+  const pathInfo = calcPath(fromPos, toPos, direction, allPositions, connection.from, connection.to);
 
   // Determine style: STRIDE takes priority over category
   const isStride = !!connection.stride;
