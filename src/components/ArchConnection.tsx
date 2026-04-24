@@ -1,21 +1,22 @@
-import React from "react";
-import type { ArchConnection, NodePosition, FlowDirection, ArchTheme, PathInfo } from "../engine/types";
-import { calcPath } from "../engine/bezier";
-import { CATEGORY_STYLES, STRIDE_STYLES, THEMES } from "../themes";
+import React, { useMemo } from "react";
+import type { ArchConnection, NodePosition, FlowDirection, ArchTheme } from "../engine/types";
+import { calcPath, calcPortAssignments } from "../engine/bezier";
+import { CATEGORY_STYLES, STRIDE_STYLES } from "../themes";
 
 interface ArchConnectionRendererProps {
   connection: ArchConnection;
   fromPos: NodePosition;
   toPos: NodePosition;
- direction: FlowDirection;
+  direction: FlowDirection;
   theme: ArchTheme;
   index: number;
   allPositions?: Map<string, NodePosition>;
+  portAssignment?: { index: number; total: number };
 }
 
 /**
- * Renders a single connection as a bezier curve with optional animated dot and label.
- * If STRIDE is set, uses threat model styling.
+ * Renders a single connection as a bezier curve with port-based routing,
+ * optional animated dot, label, and STRIDE threat indicator.
  */
 export function ArchConnectionRenderer({
   connection,
@@ -25,10 +26,19 @@ export function ArchConnectionRenderer({
   theme,
   index,
   allPositions,
+  portAssignment,
 }: ArchConnectionRendererProps) {
-  const pathInfo = calcPath(fromPos, toPos, direction, allPositions, connection.from, connection.to);
+  const pathInfo = calcPath(
+    fromPos,
+    toPos,
+    direction,
+    allPositions,
+    connection.from,
+    connection.to,
+    portAssignment?.index,
+    portAssignment?.total,
+  );
 
-  // Determine style: STRIDE takes priority over category
   const isStride = !!connection.stride;
   const catStyle = connection.stride
     ? STRIDE_STYLES[connection.stride]
@@ -36,14 +46,12 @@ export function ArchConnectionRenderer({
 
   if (!catStyle) return null;
 
-  const colors = THEMES[theme];
   const strokeColor = catStyle.dotBg;
   const dotColor = catStyle.dot;
-  const dur = 2.0 + index * 0.3; // Stagger animation timing
+  const dur = 2.0 + index * 0.3;
 
   return (
     <g>
-      {/* Bezier curve */}
       <path
         d={pathInfo.d}
         fill="none"
@@ -51,11 +59,8 @@ export function ArchConnectionRenderer({
         strokeWidth={1.5}
         strokeDasharray={catStyle.dashArray}
       />
-
-      {/* Endpoint dot */}
       <circle cx={pathInfo.x2} cy={pathInfo.y2} r={3} fill={dotColor} opacity={0.6} />
 
-      {/* Label */}
       {connection.label && (
         <text
           x={pathInfo.mx}
@@ -70,7 +75,6 @@ export function ArchConnectionRenderer({
         </text>
       )}
 
-      {/* STRIDE warning indicator */}
       {isStride && (
         <text
           x={pathInfo.mx + 24}
@@ -85,7 +89,6 @@ export function ArchConnectionRenderer({
         </text>
       )}
 
-      {/* Animated dot */}
       {connection.animated !== false && (
         <circle r={2.2} fill={dotColor} opacity={0.85}>
           <animateMotion
@@ -96,5 +99,17 @@ export function ArchConnectionRenderer({
         </circle>
       )}
     </g>
+  );
+}
+
+/**
+ * Pre-calculate port assignments for all connections.
+ */
+export function usePortAssignments(
+  connections: ArchConnection[]
+): Map<string, { index: number; total: number }> {
+  return useMemo(
+    () => calcPortAssignments(connections),
+    [connections]
   );
 }

@@ -1,10 +1,10 @@
 import React, { useMemo } from "react";
 import type { ArchFlowProps } from "../engine/types";
 import { layoutNodes } from "../engine/layout";
-import { calcPath } from "../engine/bezier";
+import { calcPath, calcPortAssignments } from "../engine/bezier";
 import { getGroupColor, THEMES } from "../themes";
 import { ArchNodeRenderer } from "./ArchNode";
-import { ArchConnectionRenderer } from "./ArchConnection";
+import { ArchConnectionRenderer, usePortAssignments } from "./ArchConnection";
 import { ArchLegend } from "./ArchLegend";
 
 /**
@@ -72,6 +72,9 @@ export function ArchFlow({
     return order;
   }, [nodes]);
 
+  // Port assignments for distributing connections across node edges
+  const portAssignments = usePortAssignments(connections);
+
   const colors = THEMES[theme];
   const pad = padding ?? 24;
 
@@ -113,6 +116,7 @@ export function ArchFlow({
               theme={theme}
               index={i}
               allPositions={positions}
+              portAssignment={portAssignments.get(`${conn.from}->${conn.to}`)}
             />
           );
         })}
