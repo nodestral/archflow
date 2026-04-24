@@ -1,0 +1,29 @@
+{
+  "name": "@nodestral/archflow",
+  "version": "0.1.0",
+  "description": "React SVG architecture flow diagrams with auto-layout, threat modeling (STRIDE), and animated data flow",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "typescript": "^5.4.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nodestral/archflow.git"
+  },
+  "keywords": ["react", "svg", "architecture", "diagram", "flow", "stride", "threat-modeling"]
+}
