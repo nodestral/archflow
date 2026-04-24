@@ -78,7 +78,7 @@ export function ArchFlow({
   // Dynamic SVG dimensions based on actual content bounds
   const contentW = pathBounds.maxX - pathBounds.minX;
   const contentH = pathBounds.maxY - pathBounds.minY;
-  const legendH = showLegend ? 40 : 0; // separator + text
+  const legendH = showLegend ? 50 : 0; // enough for 2 rows of legend
 
   const svgW = overrideW ?? Math.ceil(contentW + pad * 2);
   const svgH = overrideH ?? Math.ceil(contentH + pad * 2 + legendH);
