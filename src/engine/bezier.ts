@@ -2,13 +2,30 @@ import type { NodePosition, FlowDirection, PathInfo } from "../engine/types";
 
 type PortSide = "top" | "bottom" | "left" | "right";
 
+interface PortInfo {
+  side: PortSide;
+  index: number;  // position within connections on this side
+  total: number;  // total connections on this side
+}
+
 /**
- * Get a point on a node's edge at a specific offset from center.
+ * Get a point on a node's edge. Distributes multiple ports evenly along the edge.
+ * The usable area is 80% of the edge length, centered.
  */
-function getPort(pos: NodePosition, side: PortSide, offset: number): { x: number; y: number } {
+function getPort(pos: NodePosition, side: PortSide, index: number, total: number): { x: number; y: number } {
   const { x, y, w, h } = pos;
   const cx = x + w / 2;
   const cy = y + h / 2;
+
+  // Usable range: 80% of edge, centered
+  const usable = (side === "left" || side === "right") ? h * 0.7 : w * 0.7;
+  let offset: number;
+
+  if (total <= 1) {
+    offset = 0;
+  } else {
+    offset = -usable / 2 + (index / (total - 1)) * usable;
+  }
 
   switch (side) {
     case "left":   return { x, y: cy + offset };
@@ -19,10 +36,10 @@ function getPort(pos: NodePosition, side: PortSide, offset: number): { x: number
 }
 
 /**
- * Determine the best exit side from source and entry side to target
- * based on relative positions.
+ * Determine exit side from source node and entry side to target node
+ * based on their relative positions in the layout.
  */
-function bestSides(
+function pickSides(
   from: NodePosition,
   to: NodePosition,
   direction: FlowDirection
@@ -32,43 +49,31 @@ function bestSides(
   const toCx = to.x + to.w / 2;
   const toCy = to.y + to.h / 2;
 
+  const dx = toCx - fromCx;
+  const dy = toCy - fromCy;
+  const absDx = Math.abs(dx);
+  const absDy = Math.abs(dy);
+
   if (direction === "horizontal") {
-    // Primary: left→right flow
-    if (toCx > fromCx + from.w / 2) {
-      // Target is clearly to the right
-      return { fromSide: "right", toSide: "left" };
-    } else if (toCx < fromCx - from.w / 2) {
-      // Target is clearly to the left
-      return { fromSide: "left", toSide: "right" };
-    } else {
-      // Same column or overlapping — use vertical sides based on Y position
-      if (toCy < fromCy) {
-        // Target is above
-        return { fromSide: "top", toSide: "bottom" };
-      } else {
-        // Target is below
-        return { fromSide: "bottom", toSide: "top" };
-      }
+    // If vertical offset is significant (>30% of horizontal, with minimum), route vertically
+    if (absDy > absDx * 0.3 && absDy > 10) {
+      if (dy < 0) return { fromSide: "top", toSide: "bottom" };
+      else return { fromSide: "bottom", toSide: "top" };
     }
+    if (dx >= 0) return { fromSide: "right", toSide: "left" };
+    else return { fromSide: "left", toSide: "right" };
   } else {
-    // Vertical: top→bottom flow
-    if (toCy > fromCy + from.h / 2) {
-      return { fromSide: "bottom", toSide: "top" };
-    } else if (toCy < fromCy - from.h / 2) {
-      return { fromSide: "top", toSide: "bottom" };
-    } else {
-      // Same row — use horizontal sides
-      if (toCx < fromCx) {
-        return { fromSide: "left", toSide: "right" };
-      } else {
-        return { fromSide: "right", toSide: "left" };
-      }
+    if (absDx > absDy * 0.3 && absDx > 10) {
+      if (dx < 0) return { fromSide: "left", toSide: "right" };
+      else return { fromSide: "right", toSide: "left" };
     }
+    if (dy >= 0) return { fromSide: "bottom", toSide: "top" };
+    else return { fromSide: "top", toSide: "bottom" };
   }
 }
 
 /**
- * Check if a path would cross a node.
+ * Check if a direct path between two points would cross a node.
  */
 function wouldCrossNode(
   x1: number, y1: number,
@@ -90,6 +95,54 @@ function wouldCrossNode(
 }
 
 /**
+ * Build port assignments: for each connection, determine which side it exits/enters
+ * and its position among other connections on that same side of that node.
+ */
+export function calcPortAssignments(
+  connections: Array<{ from: string; to: string }>,
+  allPositions?: Map<string, NodePosition>,
+  direction?: FlowDirection,
+): Map<string, PortInfo> {
+  const assignments = new Map<string, PortInfo>();
+
+  // Group connections by (nodeId, side) to count and index
+  const outgoing = new Map<string, Array<{ connIdx: number; side: PortSide }>>();
+  const incoming = new Map<string, Array<{ connIdx: number; side: PortSide }>>();
+
+  connections.forEach((conn, connIdx) => {
+    const fromPos = allPositions?.get(conn.from);
+    const toPos = allPositions?.get(conn.to);
+    if (!fromPos || !toPos || !direction) return;
+
+    const { fromSide, toSide } = pickSides(fromPos, toPos, direction);
+
+    const outKey = `${conn.from}|${fromSide}`;
+    if (!outgoing.has(outKey)) outgoing.set(outKey, []);
+    outgoing.get(outKey)!.push({ connIdx, side: fromSide });
+
+    const inKey = `${conn.to}|${toSide}`;
+    if (!incoming.has(inKey)) incoming.set(inKey, []);
+    incoming.get(inKey)!.push({ connIdx, side: toSide });
+  });
+
+  // Assign indices
+  for (const [, entries] of outgoing) {
+    entries.forEach((entry, index) => {
+      const key = `out-${entry.connIdx}`;
+      assignments.set(key, { side: entry.side, index, total: entries.length });
+    });
+  }
+  for (const [, entries] of incoming) {
+    entries.forEach((entry, index) => {
+      const key = `in-${entry.connIdx}`;
+      assignments.set(key, { side: entry.side, index, total: entries.length });
+    });
+  }
+
+  return assignments;
+}
+
+/**
  * Calculate bezier path with smart port routing and obstacle avoidance.
  */
 export function calcPath(
@@ -99,25 +152,18 @@ export function calcPath(
   allPositions?: Map<string, NodePosition>,
   fromId?: string,
   toId?: string,
-  fromPortIndex?: number,
-  fromPortTotal?: number,
-  toPortIndex?: number,
-  toPortTotal?: number,
+  fromPortInfo?: PortInfo,
+  toPortInfo?: PortInfo,
 ): PathInfo {
-  // Determine best sides based on relative positions
-  const { fromSide, toSide } = bestSides(from, to, direction);
+  const { fromSide, toSide } = pickSides(from, to, direction);
 
-  // Port spread: distribute multiple connections along the edge
-  const PORT_SPREAD = 10;
-  const fromOffset = fromPortTotal && fromPortTotal > 1
-    ? (fromPortIndex! - (fromPortTotal - 1) / 2) * PORT_SPREAD
-    : 0;
-  const toOffset = toPortTotal && toPortTotal > 1
-    ? (toPortIndex! - (toPortTotal - 1) / 2) * PORT_SPREAD
-    : 0;
-
-  const fp = getPort(from, fromSide, fromOffset);
-  const tp = getPort(to, toSide, toOffset);
+  // Use provided port info, or default to center of the chosen side
+  const fp = fromPortInfo
+    ? getPort(from, fromPortInfo.side, fromPortInfo.index, fromPortInfo.total)
+    : getPort(from, fromSide, 0, 1);
+  const tp = toPortInfo
+    ? getPort(to, toPortInfo.side, toPortInfo.index, toPortInfo.total)
+    : getPort(to, toSide, 0, 1);
 
   const x1 = fp.x, y1 = fp.y;
   const x2 = tp.x, y2 = tp.y;
@@ -145,27 +191,22 @@ export function calcPath(
   let my: number;
 
   if (needsReroute) {
-    // Determine if we should route above, below, left, or right of obstacles
     const obsMidY = (obsTop + obsBottom) / 2;
     const obsMidX = (obsLeft + obsRight) / 2;
 
     if (direction === "horizontal") {
-      // Prefer vertical detour
       const routeAbove = y1 <= obsMidY && y2 <= obsMidY;
       const arcY = routeAbove ? obsTop - 28 : obsBottom + 28;
       const mx1 = x1 + (x2 - x1) * 0.25;
       const mx2 = x1 + (x2 - x1) * 0.75;
-
       d = `M ${x1} ${y1} C ${mx1} ${y1}, ${mx1} ${arcY}, ${(mx1 + mx2) / 2} ${arcY} S ${mx2} ${y2}, ${x2} ${y2}`;
       mx = (mx1 + mx2) / 2;
       my = arcY;
     } else {
-      // Horizontal detour for vertical layout
       const routeLeft = x1 <= obsMidX && x2 <= obsMidX;
       const arcX = routeLeft ? obsLeft - 28 : obsRight + 28;
       const my1 = y1 + (y2 - y1) * 0.25;
       const my2 = y1 + (y2 - y1) * 0.75;
-
       d = `M ${x1} ${y1} C ${x1} ${my1}, ${arcX} ${my1}, ${arcX} ${(my1 + my2) / 2} S ${x2} ${my2}, ${x2} ${y2}`;
       mx = arcX;
       my = (my1 + my2) / 2;
@@ -174,15 +215,11 @@ export function calcPath(
     mx = (x1 + x2) / 2;
     my = (y1 + y2) / 2;
 
-    // Generate smooth bezier based on which sides we're connecting
     if ((fromSide === "right" && toSide === "left") || (fromSide === "left" && toSide === "right")) {
-      // Horizontal flow
       d = `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
     } else if ((fromSide === "bottom" && toSide === "top") || (fromSide === "top" && toSide === "bottom")) {
-      // Vertical flow
       d = `M ${x1} ${y1} C ${x1} ${my}, ${x2} ${my}, ${x2} ${y2}`;
     } else {
-      // Mixed (e.g., top→left, right→bottom) — use two control points
       const cp1x = fromSide === "top" || fromSide === "bottom" ? x1 : mx;
       const cp1y = fromSide === "left" || fromSide === "right" ? y1 : my;
       const cp2x = toSide === "top" || toSide === "bottom" ? x2 : mx;
@@ -192,30 +229,4 @@ export function calcPath(
   }
 
   return { d, mx, my, x1, y1, x2, y2 };
-}
-
-/**
- * Pre-calculate port assignments for distributing connections across node edges.
- */
-export function calcPortAssignments(
-  connections: Array<{ from: string; to: string }>,
-  _nodeIds?: string[]
-): Map<string, { index: number; total: number }> {
-  const incomingCounts = new Map<string, string[]>();
-
-  for (const conn of connections) {
-    if (!incomingCounts.has(conn.to)) incomingCounts.set(conn.to, []);
-    incomingCounts.get(conn.to)!.push(conn.from);
-  }
-
-  const assignments = new Map<string, { index: number; total: number }>();
-
-  for (const [targetId, sources] of incomingCounts) {
-    const total = sources.length;
-    sources.forEach((sourceId, index) => {
-      assignments.set(`${sourceId}->${targetId}`, { index, total });
-    });
-  }
-
-  return assignments;
 }

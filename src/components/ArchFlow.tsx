@@ -72,8 +72,8 @@ export function ArchFlow({
     return order;
   }, [nodes]);
 
-  // Port assignments for distributing connections across node edges
-  const portAssignments = usePortAssignments(connections);
+  // Port assignments: per-side distribution with actual positions
+  const portAssignments = usePortAssignments(connections, positions, direction);
 
   const colors = THEMES[theme];
   const pad = padding ?? 24;
@@ -116,7 +116,8 @@ export function ArchFlow({
               theme={theme}
               index={i}
               allPositions={positions}
-              portAssignment={portAssignments.get(`${conn.from}->${conn.to}`)}
+              fromPortInfo={portAssignments.get(`out-${i}`)}
+              toPortInfo={portAssignments.get(`in-${i}`)}
             />
           );
         })}

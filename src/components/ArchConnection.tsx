@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import type { ArchConnection, NodePosition, FlowDirection, ArchTheme } from "../engine/types";
+import type { PortInfo } from "../engine/bezier";
 import { calcPath, calcPortAssignments } from "../engine/bezier";
 import { CATEGORY_STYLES, STRIDE_STYLES } from "../themes";
 
@@ -11,13 +12,10 @@ interface ArchConnectionRendererProps {
   theme: ArchTheme;
   index: number;
   allPositions?: Map<string, NodePosition>;
-  portAssignment?: { index: number; total: number };
+  fromPortInfo?: PortInfo;
+  toPortInfo?: PortInfo;
 }
 
-/**
- * Renders a single connection as a bezier curve with port-based routing,
- * optional animated dot, label, and STRIDE threat indicator.
- */
 export function ArchConnectionRenderer({
   connection,
   fromPos,
@@ -26,7 +24,8 @@ export function ArchConnectionRenderer({
   theme,
   index,
   allPositions,
-  portAssignment,
+  fromPortInfo,
+  toPortInfo,
 }: ArchConnectionRendererProps) {
   const pathInfo = calcPath(
     fromPos,
@@ -35,8 +34,8 @@ export function ArchConnectionRenderer({
     allPositions,
     connection.from,
     connection.to,
-    portAssignment?.index,
-    portAssignment?.total,
+    fromPortInfo,
+    toPortInfo,
   );
 
   const isStride = !!connection.stride;
@@ -102,14 +101,15 @@ export function ArchConnectionRenderer({
   );
 }
 
-/**
- * Pre-calculate port assignments for all connections.
- */
+export type { PortInfo };
+
 export function usePortAssignments(
-  connections: ArchConnection[]
-): Map<string, { index: number; total: number }> {
+  connections: ArchConnection[],
+  allPositions?: Map<string, NodePosition>,
+  direction?: FlowDirection,
+): Map<string, PortInfo> {
   return useMemo(
-    () => calcPortAssignments(connections),
-    [connections]
+    () => calcPortAssignments(connections, allPositions, direction),
+    [connections, allPositions, direction]
   );
 }
