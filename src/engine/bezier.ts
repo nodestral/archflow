@@ -2,7 +2,7 @@ import type { NodePosition, FlowDirection, PathInfo } from "../engine/types";
 
 type PortSide = "top" | "bottom" | "left" | "right";
 
-interface PortInfo {
+export interface PortInfo {
   side: PortSide;
   index: number;  // position within connections on this side
   total: number;  // total connections on this side
