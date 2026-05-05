@@ -8,6 +8,9 @@ export { ArchLegend } from "./components/ArchLegend";
 export { layoutNodes } from "./engine/layout";
 export { calcPath } from "./engine/bezier";
 
+// Export utilities
+export { exportPNG, exportSVG, useArchflowExport } from "./export";
+
 // Types
 export type {
   ArchNode,

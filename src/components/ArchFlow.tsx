@@ -13,7 +13,7 @@ import { ArchLegend } from "./ArchLegend";
  * Renders nodes and connections as SVG with auto-layout, bezier curves,
  * animated data flow dots, obstacle avoidance, and STRIDE threat indicators.
  */
-export function ArchFlow({
+export const ArchFlow = React.forwardRef<HTMLDivElement, ArchFlowProps>(function ArchFlow({
   nodes,
   connections,
   direction = "horizontal",
@@ -26,7 +26,7 @@ export function ArchFlow({
   nodeWidth,
   nodeHeight,
   padding,
-}: ArchFlowProps) {
+}, ref) {
   const { positions, width, height } = useMemo(
     () => layoutNodes(nodes, connections, direction, { nodeGap, layerGap, nodeWidth, nodeHeight, padding }),
     [nodes, connections, direction, nodeGap, layerGap, nodeWidth, nodeHeight, padding]
@@ -88,6 +88,7 @@ export function ArchFlow({
 
   return (
     <div
+      ref={ref}
       style={{
         overflowX: "auto",
         borderRadius: 8,
@@ -150,7 +151,7 @@ export function ArchFlow({
       </svg>
     </div>
   );
-}
+});
 
 /** Sample points along a bezier path to find bounding box */
 function sampleBezier(pathInfo: { d: string; x1: number; y1: number; x2: number; y2: number }): { x: number; y: number }[] {
